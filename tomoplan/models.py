@@ -96,6 +96,41 @@ def make_generator(img_h, img_w, conv_num, conv_size, dropout, output_num):
     return tf.keras.Model(inputs=inputs, outputs=x)
 
 
+def make_generator_3d(img_h, img_w, conv_num, conv_size, dropout, output_num):
+    fc_size = img_w ** 2
+    inputs = Input(shape=(img_h, img_w, 1))
+ 
+
+    conv_stack = [
+        conv2d_norm(conv_num, conv_size+2, 1),
+        conv2d_norm(conv_num, conv_size+2, 1),
+        conv2d_norm(conv_num, conv_size, 1),
+
+    ]
+
+    dconv_stack = [
+        dconv2d_norm(conv_num, conv_size+2, 1),
+        dconv2d_norm(conv_num, conv_size+2, 1),
+        dconv2d_norm(conv_num, conv_size, 1),
+    ]
+
+    last = conv2d_norm(output_num, 3, 1)
+
+    for fc in fc_stack:
+        x = fc(x)
+
+    x = tf.reshape(x, shape=[-1, img_w, img_w, 1])
+    # Convolutions
+    for conv in conv_stack:
+        x = conv(x)
+
+    for dconv in dconv_stack:
+        x = dconv(x)
+    x = last(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x)
+
+
 def make_filter(img_h, img_w):
     inputs = Input(shape=[img_h, img_w, 1])
     down_stack = [
