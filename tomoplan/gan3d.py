@@ -1,8 +1,8 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-from ganrec.models import make_generator, make_discriminator, make_filter
-from ganrec.utils import RECONmonitor, ffactor
+from tomoplan.models import make_generator_3d, make_discriminator
+# from ganrec.utils import RECONmonitor
 
 
 # @tf.function
@@ -28,7 +28,7 @@ def generator_loss(fake_output, img_output, pred, l1_ratio):
 
 
 # @tf.function
-def filer_loss(fake_output, img_output, img_filter):
+def filter_loss(fake_output, img_output, img_filter):
     f_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=fake_output,
                                                                     labels=tf.ones_like(fake_output))) + \
              l1_loss(img_output, img_filter) * 100
@@ -39,6 +39,12 @@ def tfnor_data(img):
     img = (img - tf.reduce_min(img)) / (tf.reduce_max(img) - tf.reduce_min(img))
     return img
 
+def tfnor_tomo(img):
+    img = tf.image.per_image_standardization(img)
+    img = img / tf.reduce_max(img)
+    img = img - tf.reduce_min(img)
+    # img = (img - tf.reduce_min(img)) / (tf.reduce_max(img) - tf.reduce_min(img))
+    return img
 
 def tfnor_phase(img):
     img = tf.image.per_image_standardization(img)
@@ -260,20 +266,18 @@ class GANtomo:
         # return avg_results(recon, gen_loss)
 
 
-class GANphase:
-    def __init__(self, i_input, energy, z, pv, iter_num):
-        self.i_input = i_input
-        self.px, _ = i_input.shape
-        self.energy = energy
-        self.z = z
-        self.pv = pv
+class GAN3d:
+    def __init__(self, train_input, train_output, iter_num):
+        self.train_input = train_input
+        self.train_output = train_output
+        self.px, _ = train_input.shape
         self.iter_num = iter_num
         self.conv_num = 32
         self.conv_size = 3
         self.dropout = 0.25
         self.l1_ratio = 100
         self.g_learning_rate = 5e-4
-        self.d_learning_rate = 1e-4
+        self.d_learning_rate = 1e-5
         self.phase_only = True
         self.recon_monitor = True
         self.filter = None
@@ -284,16 +288,10 @@ class GANphase:
         self.discriminator_optimizer = None
 
     def make_model(self):
-        self.filter = make_filter(self.i_input.shape[0],
-                                  self.i_input.shape[1])
-        self.generator = make_generator(self.i_input.shape[0],
-                                        self.i_input.shape[1],
-                                        self.conv_num,
-                                        self.conv_size,
-                                        self.dropout,
-                                        2)
-        self.discriminator = make_discriminator(self.i_input.shape[0],
-                                                self.i_input.shape[1])
+        self.generator = make_generator_3d(self.train_input.shape[0],
+                                           self.train_input.shape[1])
+        # self.generator.summary()
+        self.discriminator = make_discriminator()
         self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
         self.generator_optimizer = tf.keras.optimizers.Adam(self.g_learning_rate)
         self.discriminator_optimizer = tf.keras.optimizers.Adam(self.d_learning_rate)
@@ -307,19 +305,15 @@ class GANphase:
                                          discriminator=self.discriminator)
 
     @tf.function
-    def rec_step(self, i_input, ff):
+    def train_step(self, train_input, train_output):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            recon = self.generator(i_input)
-            phase = tfnor_phase(recon[:, :, :, 0]) - 1
-            phase = tf.reshape(phase, [self.px, self.px])
-            absorption = (1 - tfnor_phase(recon[:, :, :, 1])) * 0.05
-            absorption = tf.reshape(absorption, [self.px, self.px])
-            if self.phase_only:
-                absorption = tf.zeros_like(phase)
-            i_rec = phase_fresnel(phase, absorption, ff, self.px)
-            real_output = self.discriminator(i_input, training=True)
-            fake_output = self.discriminator(i_rec, training=True)
-            g_loss = generator_loss(fake_output, i_input, i_rec, self.l1_ratio)
+            recon = self.generator(train_input)
+            # recon = tfnor_data(recon)
+            # print(recon)
+            # print(train_output)
+            real_output = self.discriminator(train_output, training=True)
+            fake_output = self.discriminator(recon, training=True)
+            g_loss = generator_loss(fake_output, train_output, recon, self.l1_ratio)
             d_loss = discriminator_loss(real_output, fake_output)
         gradients_of_generator = gen_tape.gradient(g_loss,
                                                    self.generator.trainable_variables)
@@ -329,84 +323,31 @@ class GANphase:
                                                      self.generator.trainable_variables))
         self.discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator,
                                                          self.discriminator.trainable_variables))
-        return {'phase': phase,
-                'absorption': absorption,
-                'i_rec': i_rec,
+        return {'recon': recon,
                 'g_loss': g_loss,
                 'd_loss': d_loss}
 
-    def rec_step_filter(self, prj, ang):
-        with tf.GradientTape() as filter_tape, tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            # tf.print(tf.reduce_min(sino), tf.reduce_max(sino))
-            prj_filter = self.filter(prj)
-            prj_filter = tfnor_data(prj_filter)
-            recon = self.generator(prj_filter)
-            recon = tfnor_data(recon)
-            prj_rec = tomo_radon(recon, ang)
-            prj_rec = tfnor_data(prj_rec)
-            real_output = self.discriminator(prj, training=True)
-            filter_output = self.discriminator(prj_filter, training=True)
-            fake_output = self.discriminator(prj_rec, training=True)
-            f_loss = filer_loss(filter_output, prj, prj_filter)
-            g_loss = generator_loss(fake_output, prj_filter, prj_rec)
-            d_loss = discriminator_loss(real_output, fake_output)
-        gradients_of_filter = filter_tape.gradient(f_loss,
-                                                   self.filter.trainable_variables)
-        gradients_of_generator = gen_tape.gradient(g_loss,
-                                                   self.generator.trainable_variables)
-        gradients_of_discriminator = disc_tape.gradient(d_loss,
-                                                        self.discriminator.trainable_variables)
-        self.filter_optimizer.apply_gradients(zip(gradients_of_filter,
-                                                  self.filter.trainable_variables))
-        self.generator_optimizer.apply_gradients(zip(gradients_of_generator,
-                                                     self.generator.trainable_variables))
-        self.discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator,
-                                                         self.discriminator.trainable_variables))
-        return recon, prj_rec, g_loss, d_loss
-
     @property
-    def recon(self):
-        ff = ffactor(self.px * 2, self.energy, self.z, self.pv)
-        print(ff.shape, ff.max(), ff.min())
-
-        i_input = np.reshape(self.i_input, (1, self.px, self.px, 1))
-        i_input = tf.cast(i_input, dtype=tf.float32)
+    def train(self):
+        train_input = np.reshape(self.train_input, (1, self.px, self.px, 1))
+        # train_output = tfnor_data(train_input)
+        train_output = np.reshape(self.train_output, (1, self.px, self.px, self.px))
+        # train_output = tfnor_data(train_output)
         self.make_model()
-        phase = np.zeros((self.iter_num, self.px, self.px))
-        absorption = np.zeros((self.iter_num, self.px, self.px))
-        gen_loss = np.zeros(self.iter_num)
+        # gen_loss = np.zeros(self.iter_num)
 
-        ###########################################################################
-        # Reconstruction process monitor
-        if self.recon_monitor:
-            plot_x, plot_loss = [], []
-            recon_monitor = RECONmonitor('phase')
-            recon_monitor.initial_plot(self.i_input)
         ###########################################################################
         for epoch in range(self.iter_num):
 
             ###########################################################################
             ## Call the rconstruction step
-            step_results = self.rec_step(i_input, ff)
-            phase[epoch, :, :] = step_results['phase']
-            absorption[epoch, :, :] = step_results['absorption']
-            i_rec = step_results['i_rec']
-            gen_loss[epoch] = step_results['g_loss']
-            d_loss = step_results['d_loss']
-            # phase[epoch, :, :], absorption[epoch, :, :], i_rec, gen_loss[epoch], d_loss = self.rec_step(i_input,
-            #                                                                                                   ff)
+            step_results = self.train_step(train_input, train_output)
+            recon = step_results['recon']
+            gen_loss = step_results['g_loss']
+            d_loss = step_results['d_loss']                                                                            
             ###########################################################################
-
-            plot_x.append(epoch)
-            plot_loss = gen_loss[:epoch + 1]
-            if (epoch + 1) % 100 == 0:
-                # checkpoint.save(file_prefix=checkpoint_prefix)
-                if recon_monitor:
-                    i_rec = np.reshape(i_rec, (self.px, self.px))
-                    i_diff = np.abs(i_rec - self.i_input.reshape((self.px, self.px)))
-                    phase_plt = np.reshape(phase[epoch], (self.px, self.px))
-                    recon_monitor.update_plot(epoch, i_diff, phase_plt, plot_x, plot_loss)
-                print(phase.max(), phase.min())
-                print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss[epoch], d_loss.numpy()))
-        return phase[epoch]
-        # return avg_results(recon, gen_loss)
+        
+            print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss, d_loss.numpy()))
+        return recon
+    
+    # def predict(self):

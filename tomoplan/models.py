@@ -7,13 +7,16 @@ def dense_norm(units, dropout, apply_batchnorm=True):
 
     result = tf.keras.Sequential()
     result.add(
-        layers.Dense(units, activation=tf.nn.tanh, use_bias=True, kernel_initializer=initializer))
+        layers.Dense(units,
+        activation=tf.nn.tanh, 
+        use_bias=True, 
+        kernel_initializer=initializer))
     result.add(layers.Dropout(dropout))
 
     if apply_batchnorm:
         result.add(layers.BatchNormalization())
 
-    #     result.add(layers.LeakyReLU())
+    # result.add(layers.LeakyReLU())
 
     return result
 
@@ -23,8 +26,12 @@ def conv2d_norm(filters, size, strides, apply_batchnorm=True):
 
     result = tf.keras.Sequential()
     result.add(
-        layers.Conv2D(filters, size, strides=strides, padding='same',
-                      kernel_initializer=initializer, activation=tf.nn.elu))
+        layers.Conv2D(filters, 
+        size, 
+        strides=strides, 
+        padding='same',
+        kernel_initializer=initializer,
+        activation=tf.nn.elu))
 
     if apply_batchnorm:
         result.add(layers.BatchNormalization())
@@ -47,9 +54,9 @@ def dconv2d_norm(filters, size, strides, apply_dropout=False):
     result.add(tf.keras.layers.BatchNormalization())
 
     if apply_dropout:
-        result.add(tf.keras.layers.Dropout(0.5))
+        result.add(tf.keras.layers.Dropout(0.2))
 
-    result.add(tf.keras.layers.ReLU())
+    result.add(tf.keras.layers.LeakyReLU())
 
     return result
 
@@ -96,35 +103,39 @@ def make_generator(img_h, img_w, conv_num, conv_size, dropout, output_num):
     return tf.keras.Model(inputs=inputs, outputs=x)
 
 
-def make_filter(img_h, img_w):
+
+def make_generator_3d(img_h, img_w):
     inputs = Input(shape=[img_h, img_w, 1])
     down_stack = [
-        conv2d_norm(32, 3, 1, apply_batchnorm=False),  # (batch_size, 128, 128, 64)
-        # conv2d_norm(128, 4, 2),  # (batch_size, 64, 64, 128)
-        # conv2d_norm(256, 4, 2),  # (batch_size, 32, 32, 256)
-        # conv2d_norm(512, 4, 2),  # (batch_size, 16, 16, 512)
-        # conv2d_norm(512, 4, 2),  # (batch_size, 8, 8, 512)
-        # conv2d_norm(512, 4, 2),  # (batch_size, 4, 4, 512)
-        # conv2d_norm(512, 4, 2),  # (batch_size, 2, 2, 512)
-        # conv2d_norm(512, 4, 2),  # (batch_size, 1, 1, 512)
+        conv2d_norm(256, 3, 1),  # (batch_size, 128, 128, 64)
+        conv2d_norm(256, 3, 2),  # (batch_size, 64, 64, 128)
+        conv2d_norm(512, 3, 1),  # (batch_size, 32, 32, 256)
+        conv2d_norm(512, 3, 2),  # (batch_size, 16, 16, 512)
+        conv2d_norm(512, 3, 1),  # (batch_size, 8, 8, 512)
+        conv2d_norm(512, 3, 2),  # (batch_size, 4, 4, 512)
+        conv2d_norm(512, 3, 1),  # (batch_size, 2, 2, 512)
+        conv2d_norm(1, 3, 1),  # (batch_size, 1, 1, 512)
+    ]
+    fc_stack = [
+        dense_norm(128, 0.2),
+        dense_norm(256, 0.2),
+        dense_norm(128, 0.2),
+        dense_norm(img_h*img_w//64, 0),
     ]
 
     up_stack = [
-        # dconv2d_norm(512, 4, 2, apply_dropout=True),  # (batch_size, 2, 2, 1024)
-        # dconv2d_norm(512, 4, 2, apply_dropout=True),  # (batch_size, 4, 4, 1024)
-        # dconv2d_norm(512, 4, 2, apply_dropout=True),  # (batch_size, 8, 8, 1024)
-        # dconv2d_norm(512, 4, 2),  # (batch_size, 16, 16, 1024)
-        # dconv2d_norm(256, 4, 2),  # (batch_size, 32, 32, 512)
-        # dconv2d_norm(128, 4, 2),  # (batch_size, 64, 64, 256)
-        dconv2d_norm(32, 3, 1),  # (batch_size, 128, 128, 128)
+        dconv2d_norm(1, 3, 1),  # (batch_size, 2, 2, 1024)
+        dconv2d_norm(512, 3, 1),  # (batch_size, 4, 4, 1024)
+        dconv2d_norm(512, 3, 2),  # (batch_size, 8, 8, 1024)
+        dconv2d_norm(512, 3, 1),  # (batch_size, 16, 16, 1024)
+        dconv2d_norm(512, 3, 2),  # (batch_size, 32, 32, 512)
+        dconv2d_norm(512, 3, 1),  # (batch_size, 64, 64, 256)
+        dconv2d_norm(256, 3, 2),  # (batch_size, 128, 128, 128)
+        dconv2d_norm(256, 5, 1),
+        dconv2d_norm(256, 5, 1),
+        dconv2d_norm(256, 5, 1),
     ]
-    last = conv2d_norm(1, 3, 1)
-    # initializer = tf.random_normal_initializer(0., 0.02)
-    # last = tf.keras.layers.Conv2DTranspose(1, 3,
-    #                                        strides=1,
-    #                                        padding='same',
-    #                                        kernel_initializer=initializer,
-    #                                        activation='tanh')  # (batch_size, 256, 256, 3)
+    last = dconv2d_norm(128, 3, 1)    
 
     x = inputs
 
@@ -135,6 +146,11 @@ def make_filter(img_h, img_w):
         skips.append(x)
 
     skips = reversed(skips[:-1])
+    x = tf.keras.layers.Flatten()(x)
+    for fc in fc_stack:
+        x = fc(x)
+    x = tf.reshape(x, [1, img_h//8, img_w//8, 1])
+
 
     # Upsampling and establishing the skip connections
     for up, skip in zip(up_stack, skips):
@@ -146,10 +162,9 @@ def make_filter(img_h, img_w):
     return tf.keras.Model(inputs=inputs, outputs=x)
 
 
-def make_discriminator(nang, px):
+def make_discriminator():
     model = tf.keras.Sequential()
-    model.add(layers.Conv2D(16, (5, 5), strides=(2, 2), padding='same',
-                            input_shape=[nang, px, 1]))
+    model.add(layers.Conv2D(16, (5, 5), strides=(2, 2), padding='same'))
     model.add(layers.Conv2D(16, (5, 5), strides=(1, 1), padding='same'))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.2))
@@ -171,5 +186,6 @@ def make_discriminator(nang, px):
 
     model.add(layers.Flatten())
     model.add(layers.Dense(1))
+
 
     return model
