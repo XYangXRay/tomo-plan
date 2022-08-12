@@ -1,7 +1,8 @@
+from builtins import property
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-from tomoplan.models import make_generator_3d, make_discriminator
+from tomoplan.models import make_generator_3d, make_generator_3dped1, make_discriminator
 # from ganrec.utils import RECONmonitor
 
 
@@ -267,9 +268,10 @@ class GANtomo:
 
 
 class GAN3d:
-    def __init__(self, train_input, train_output, iter_num):
+    def __init__(self, train_input, train_output, test_input, iter_num):
         self.train_input = train_input
         self.train_output = train_output
+        self.test_input = test_input
         self.px, _ = train_input.shape
         self.iter_num = iter_num
         self.conv_num = 32
@@ -290,7 +292,9 @@ class GAN3d:
     def make_model(self):
         self.generator = make_generator_3d(self.train_input.shape[0],
                                            self.train_input.shape[1])
-        # self.generator.summary()
+        # self.generator = make_generator_3dped1(self.train_input.shape[0],
+                                        #    self.train_input.shape[1])
+        self.generator.summary()
         self.discriminator = make_discriminator()
         self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
         self.generator_optimizer = tf.keras.optimizers.Adam(self.g_learning_rate)
@@ -346,8 +350,19 @@ class GAN3d:
             gen_loss = step_results['g_loss']
             d_loss = step_results['d_loss']                                                                            
             ###########################################################################
+            if (epoch + 1) % 100 == 0:
+                print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss, d_loss.numpy()))
         
-            print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss, d_loss.numpy()))
+        self.generator.save('/data/weights/3d_generator.h5')
+        self.discriminator.save('/data/weights/3d_discriminator.h5')
         return recon
+    
+    @property
+    def predict(self):
+        test_input = np.reshape(self.test_input, (1, self.px, self.px, 1))
+        # self.make_model()
+        # self.generator.load_weights('/data/weights/3d_generator.h5')
+        test_output = self.generator(test_input)
+        return test_output
     
     # def predict(self):
