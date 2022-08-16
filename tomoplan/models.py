@@ -132,7 +132,6 @@ def make_generator(img_h, img_w, conv_num, conv_size, dropout, output_num):
     return Model(inputs=inputs, outputs=x)
 
 
-
 def make_generator_3d(img_h, img_w):
     inputs = Input(shape=[img_h, img_w, 1])
     down_stack = [

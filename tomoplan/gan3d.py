@@ -1,7 +1,9 @@
 from builtins import property
+import time
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
+from IPython.display import clear_output
 from tomoplan.models import make_generator_3d, make_generator_3dped1, make_discriminator
 # from ganrec.utils import RECONmonitor
 
@@ -268,11 +270,10 @@ class GANtomo:
 
 
 class GAN3d:
-    def __init__(self, train_input, train_output, test_input, iter_num):
+    def __init__(self, train_input, train_output, iter_num):
         self.train_input = train_input
         self.train_output = train_output
-        self.test_input = test_input
-        self.px, _ = train_input.shape
+        self.px = train_input.shape[1]
         self.iter_num = iter_num
         self.conv_num = 32
         self.conv_size = 3
@@ -309,15 +310,15 @@ class GAN3d:
                                          discriminator=self.discriminator)
 
     @tf.function
-    def train_step(self, train_input, train_output):
+    def train_step(self, image_x, image_y):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            recon = self.generator(train_input)
+            recon = self.generator(image_x)
             # recon = tfnor_data(recon)
             # print(recon)
             # print(train_output)
-            real_output = self.discriminator(train_output, training=True)
+            real_output = self.discriminator(image_y, training=True)
             fake_output = self.discriminator(recon, training=True)
-            g_loss = generator_loss(fake_output, train_output, recon, self.l1_ratio)
+            g_loss = generator_loss(fake_output, image_y, recon, self.l1_ratio)
             d_loss = discriminator_loss(real_output, fake_output)
         gradients_of_generator = gen_tape.gradient(g_loss,
                                                    self.generator.trainable_variables)
@@ -333,36 +334,69 @@ class GAN3d:
 
     @property
     def train(self):
-        train_input = np.reshape(self.train_input, (1, self.px, self.px, 1))
-        # train_output = tfnor_data(train_input)
-        train_output = np.reshape(self.train_output, (1, self.px, self.px, self.px))
-        # train_output = tfnor_data(train_output)
-        self.make_model()
-        # gen_loss = np.zeros(self.iter_num)
+        train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
+        train_output = tf.data.Dataset.from_tensor_slices(self.train_output)      
+        train_dataset = tf.data.Dataset.zip((train_input, train_output))
+        train_dataset = train_dataset.batch(1)
+        start = time.time()
+        n = 0
+        for step, (train_x, train_y) in train_dataset.repeat().take(self.iter_num).enumerate():
+            step_results = self.train_step(train_x, train_y)
+            if n % 10 == 0:
+                    print ('.', end='')
+                    n += 1
+            clear_output(wait=True)
+            print ('Epoch {} takes {} sec. Generator loss: {} \n'.format(step + 1, time.time()-start, step_results['g_loss']))
+        # for epoch in range(self.iter_num):
 
-        ###########################################################################
-        for epoch in range(self.iter_num):
+            
+     
+            
 
-            ###########################################################################
-            ## Call the rconstruction step
-            step_results = self.train_step(train_input, train_output)
-            recon = step_results['recon']
-            gen_loss = step_results['g_loss']
-            d_loss = step_results['d_loss']                                                                            
-            ###########################################################################
-            if (epoch + 1) % 100 == 0:
-                print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss, d_loss.numpy()))
-        
+            # for image_x, image_y in train_dataset:
+            #     # image_x.element_spec
+            #     step_results = self.train_step(image_x, image_y)
+            #     if n % 10 == 0:
+            #         print ('.', end='')
+            #         n += 1
+            # clear_output(wait=True)
+            # print ('Epoch {} takes {} sec. Generator loss: {} \n'.format(step + 1, time.time()-start, step_results['g_loss']))
         self.generator.save('/data/weights/3d_generator.h5')
         self.discriminator.save('/data/weights/3d_discriminator.h5')
-        return recon
     
-    @property
-    def predict(self):
-        test_input = np.reshape(self.test_input, (1, self.px, self.px, 1))
+
+
+ 
+
+
+        
+        # train_input = np.reshape(self.train_input, (1, self.px, self.px, 1))
+        # # train_output = tfnor_data(train_input)
+        # train_output = np.reshape(self.train_output, (1, self.px, self.px, self.px))
+        # # train_output = tfnor_data(train_output)
         # self.make_model()
-        # self.generator.load_weights('/data/weights/3d_generator.h5')
-        test_output = self.generator(test_input)
-        return test_output
+        # # gen_loss = np.zeros(self.iter_num)
+
+        # ###########################################################################
+        # for epoch in range(self.iter_num):
+
+        #     ###########################################################################
+        #     ## Call the rconstruction step
+        #     step_results = self.train_step(train_input, train_output)
+        #     recon = step_results['recon']
+        #     gen_loss = step_results['g_loss']
+        #     d_loss = step_results['d_loss']                                                                            
+        #     ###########################################################################
+        #     if (epoch + 1) % 100 == 0:
+        #         print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss, d_loss.numpy()))
+        
+
+    # @property
+    # def predict(self):
+    #     test_input = np.reshape(self.test_input, (1, self.px, self.px, 1))
+    #     # self.make_model()
+    #     model = self.generator.load_weights('/data/weights/3d_generator.h5')
+    #     test_output = self.generator(test_input)
+    #     return test_output
     
     # def predict(self):
