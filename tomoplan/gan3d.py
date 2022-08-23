@@ -126,7 +126,7 @@ def phase_fraunhofer(phase, absorption):
 
 
 class GANtomo:
-    def __init__(self, prj_input, angle, iter_num):
+    def __init__(self, prj_input, angle, iter_num, **kwargs):
         self.prj_input = prj_input
         self.angle = angle
         self.iter_num = iter_num
@@ -270,27 +270,28 @@ class GANtomo:
 
 
 class GAN3d:
-    def __init__(self, train_input, train_output, iter_num):
+    def __init__(self, train_input, train_output, iter_num, **kwargs):
+        gan3d_args = _get_gan3d_kwargs()
+        gan3d_args.update(**kwargs)
+        super(GAN3d, self).__init__()
         self.train_input = train_input
         self.train_output = train_output
         self.px = train_input.shape[1]
         self.iter_num = iter_num
-        self.conv_num = 32
-        self.conv_size = 3
-        self.dropout = 0.25
-        self.l1_ratio = 100
-        self.g_learning_rate = 5e-4
-        self.d_learning_rate = 1e-5
-        self.phase_only = True
-        self.recon_monitor = True
-        self.filter = None
+        self.conv_num = gan3d_args['conv_num']
+        self.conv_size = gan3d_args['conv_size']
+        self.dropout = gan3d_args['dropout']
+        self.l1_ratio = gan3d_args['l1_ratio']
+        self.g_learning_rate = gan3d_args['g_learning_rate']
+        self.d_learning_rate = gan3d_args['d_learning_rate']
+        self.save_wpath = gan3d_args['save_wpath']
         self.generator = None
         self.discriminator = None
-        self.filter_optimizer = None
         self.generator_optimizer = None
         self.discriminator_optimizer = None
 
     def make_model(self):
+<<<<<<< HEAD
         # self.generator = make_generator_3d(self.train_input.shape[1],
         #                                    self.train_input.shape[2])
         self.generator = make_generator_3d(128,
@@ -299,6 +300,12 @@ class GAN3d:
         
         # self.generator = make_generator_3dped(self.train_input.shape[0],
         #                                    self.train_input.shape[1])
+=======
+        self.generator = make_generator_3d(self.train_input.shape[1],
+                                           self.train_input.shape[2])
+        # self.generator = make_generator_3dped1(self.train_input.shape[0],
+                                        #    self.train_input.shape[1])
+>>>>>>> e49581ff66b525ba096f92d83bc515899bc46d6f
         self.generator.summary()
         self.discriminator = make_discriminator()
         self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
@@ -339,6 +346,7 @@ class GAN3d:
     @property
     def train(self):
         self.make_model()
+<<<<<<< HEAD
         # train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
         # train_output = tf.data.Dataset.from_tensor_slices(self.train_output)      
         # train_dataset = tf.data.Dataset.zip((train_input, train_output))
@@ -347,68 +355,45 @@ class GAN3d:
                                                             self.train_output)) 
         print(train_dataset)
          
+=======
+        train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, self.train_output))
+>>>>>>> e49581ff66b525ba096f92d83bc515899bc46d6f
         train_dataset = train_dataset.batch(1)
         print(train_dataset)
         start = time.time()
         n = 0
         for step, (train_x, train_y) in train_dataset.repeat().take(self.iter_num).enumerate():
+<<<<<<< HEAD
             # print(train_x, train_y)
+=======
+            start = time.time()
+>>>>>>> e49581ff66b525ba096f92d83bc515899bc46d6f
             step_results = self.train_step(train_x, train_y)
             if n % 10 == 0:
-                    print ('.', end='')
-                    n += 1
-            clear_output(wait=True)
-            print ('Epoch {} takes {} sec. Generator loss: {} \n'.format(step + 1, time.time()-start, step_results['g_loss']))
-        # for epoch in range(self.iter_num):
-
-            
-     
-            
-
-            # for image_x, image_y in train_dataset:
-            #     # image_x.element_spec
-            #     step_results = self.train_step(image_x, image_y)
-            #     if n % 10 == 0:
-            #         print ('.', end='')
-            #         n += 1
-            # clear_output(wait=True)
-            # print ('Epoch {} takes {} sec. Generator loss: {} \n'.format(step + 1, time.time()-start, step_results['g_loss']))
-        self.generator.save('/data/weights/3d_generator.h5')
-        self.discriminator.save('/data/weights/3d_discriminator.h5')
-    
-
-
+                print ('.', end='')
+                n += 1
+                clear_output(wait=True)   
+            if step % 100 == 0:
+                print ('Epoch {} takes {} sec. Generator loss: {} \n'.format(step + 1, time.time()-start, step_results['g_loss']))
  
-
-
-        
-        # train_input = np.reshape(self.train_input, (1, self.px, self.px, 1))
-        # # train_output = tfnor_data(train_input)
-        # train_output = np.reshape(self.train_output, (1, self.px, self.px, self.px))
-        # # train_output = tfnor_data(train_output)
-        # self.make_model()
-        # # gen_loss = np.zeros(self.iter_num)
-
-        # ###########################################################################
-        # for epoch in range(self.iter_num):
-
-        #     ###########################################################################
-        #     ## Call the rconstruction step
-        #     step_results = self.train_step(train_input, train_output)
-        #     recon = step_results['recon']
-        #     gen_loss = step_results['g_loss']
-        #     d_loss = step_results['d_loss']                                                                            
-        #     ###########################################################################
-        #     if (epoch + 1) % 100 == 0:
-        #         print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1, gen_loss, d_loss.numpy()))
-        
-
-    # @property
-    # def predict(self):
-    #     test_input = np.reshape(self.test_input, (1, self.px, self.px, 1))
-    #     # self.make_model()
-    #     model = self.generator.load_weights('/data/weights/3d_generator.h5')
-    #     test_output = self.generator(test_input)
-    #     return test_output
+        g_wpath = self.save_wpath + '3d_generator.h5'
+        d_wpath = self.save_wpath + '3d_discriminator.h5'
+        self.generator.save(g_wpath)
+        self.discriminator.save(d_wpath)
     
-    # def predict(self):
+
+def _get_gan3d_kwargs():
+    return{
+        'iter_num': 1000,
+        'conv_num': 32,
+        'conv_size': 3,
+        'dropout': 0.25,
+        'l1_ratio': 100,
+        'g_learning_rate': 5e-4,
+        'd_learning_rate': 1e-5,
+        'save_wpath': './',
+        'init_wpath': None,
+        'init_model': False,
+    }
+
+
