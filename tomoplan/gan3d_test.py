@@ -21,9 +21,9 @@ prj = tomopy.project(data, ang, pad=False)
 train_input = prj[0]
 
 
-prj_test = tifffile.imread('/data/3d_tomo/test/circle_prj.tiff')
-test_input = prj_test[0]
-test_input = test_input/test_input.max()
+# prj_test = tifffile.imread('/data/3d_tomo/test/circle_prj.tiff')
+# test_input = prj_test[0]
+# test_input = test_input/test_input.max()
 
 train_input = train_input/train_input.max()
 # plt.imshow(train_input)
@@ -31,8 +31,8 @@ train_input = train_input/train_input.max()
 train_output = np.swapaxes(data, 0, 1)
 # plt.imshow(train_output[64,:,:])
 # plt.show()
-# train_input = np.reshape(train_input, (1, 128, 128, 1))
-# train_output = np.reshape(train_output, (1, 128, 128, 128))
+train_input = np.reshape(train_input, (1, 128, 128, 1))
+train_output = np.reshape(train_output, (1, 128, 128, 128))
 start = time.time()
 train_obj = GAN3d(train_input, train_output, iter_num=1000)
 recon = train_obj.train

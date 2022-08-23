@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
 from IPython.display import clear_output
-from tomoplan.models import make_generator_3d, make_generator_3dped1, make_discriminator
+from tomoplan.models import make_generator_3d, make_generator_3dped, make_discriminator
 # from ganrec.utils import RECONmonitor
 
 
@@ -291,10 +291,14 @@ class GAN3d:
         self.discriminator_optimizer = None
 
     def make_model(self):
-        self.generator = make_generator_3d(self.train_input.shape[0],
-                                           self.train_input.shape[1])
-        # self.generator = make_generator_3dped1(self.train_input.shape[0],
-                                        #    self.train_input.shape[1])
+        # self.generator = make_generator_3d(self.train_input.shape[1],
+        #                                    self.train_input.shape[2])
+        self.generator = make_generator_3d(128,
+                                           128)
+        
+        
+        # self.generator = make_generator_3dped(self.train_input.shape[0],
+        #                                    self.train_input.shape[1])
         self.generator.summary()
         self.discriminator = make_discriminator()
         self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
@@ -334,13 +338,21 @@ class GAN3d:
 
     @property
     def train(self):
-        train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
-        train_output = tf.data.Dataset.from_tensor_slices(self.train_output)      
-        train_dataset = tf.data.Dataset.zip((train_input, train_output))
+        self.make_model()
+        # train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
+        # train_output = tf.data.Dataset.from_tensor_slices(self.train_output)      
+        # train_dataset = tf.data.Dataset.zip((train_input, train_output))
+        # train_dataset = (self.train_input, self.train_output)
+        train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, 
+                                                            self.train_output)) 
+        print(train_dataset)
+         
         train_dataset = train_dataset.batch(1)
+        print(train_dataset)
         start = time.time()
         n = 0
         for step, (train_x, train_y) in train_dataset.repeat().take(self.iter_num).enumerate():
+            # print(train_x, train_y)
             step_results = self.train_step(train_x, train_y)
             if n % 10 == 0:
                     print ('.', end='')
