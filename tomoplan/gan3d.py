@@ -293,8 +293,8 @@ class GAN3d:
     def make_model(self):
         self.generator = make_generator_3d(self.train_input.shape[1],
                                            self.train_input.shape[2])
-        # self.generator = make_generator_3dped1(self.train_input.shape[0],
-                                        #    self.train_input.shape[1])
+        # self.generator = make_generator_3dped1(self.train_input.shape[1],
+        #                                    self.train_input.shape[2])
         self.generator.summary()
         self.discriminator = make_discriminator()
         self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
@@ -337,18 +337,15 @@ class GAN3d:
         self.make_model()
         train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, self.train_output))
         train_dataset = train_dataset.batch(1)
-        print(train_dataset)
-        start = time.time()
         n = 0
         for step, (train_x, train_y) in train_dataset.repeat().take(self.iter_num).enumerate():
             start = time.time()
             step_results = self.train_step(train_x, train_y)
-            if n % 10 == 0:
-                print ('.', end='')
-                n += 1
-                clear_output(wait=True)   
+      
             if step % 100 == 0:
-                print ('Epoch {} takes {} sec. Generator loss: {} \n'.format(step + 1, time.time()-start, step_results['g_loss']))
+                print ('Epoch: {} Generator loss: {} Discriminator loss: {}\n'.format(step + 1, 
+                                                                                   step_results['g_loss'], 
+                                                                                   step_results['d_loss']))
  
         g_wpath = self.save_wpath + '3d_generator.h5'
         d_wpath = self.save_wpath + '3d_discriminator.h5'
@@ -362,8 +359,8 @@ def _get_gan3d_kwargs():
         'conv_num': 32,
         'conv_size': 3,
         'dropout': 0.25,
-        'l1_ratio': 100,
-        'g_learning_rate': 5e-4,
+        'l1_ratio': 10,
+        'g_learning_rate': 5e-5,
         'd_learning_rate': 1e-5,
         'save_wpath': './',
         'init_wpath': None,

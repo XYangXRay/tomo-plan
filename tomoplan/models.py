@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras import Sequential, Input, Model
 from tensorflow.keras.layers import Dense, Conv2D, \
     Conv2DTranspose, Flatten, concatenate, \
-    BatchNormalization, Dropout, LeakyReLU, Add  
+    BatchNormalization, Dropout, LeakyReLU, ReLU  
 
 
 def dense_norm(units, dropout, apply_batchnorm=True):
@@ -79,9 +79,11 @@ def dconv2d_norm(filters, size, strides, apply_dropout=False):
 
 def resblock(x, filters, size):
     x = Conv2D(filters, size, padding='same')(x)
+    fx = BatchNormalization()(x)
     fx = Conv2DTranspose(filters, size, activation='relu', padding='same')(x)
     fx = BatchNormalization()(fx)
     fx = Conv2DTranspose(filters, size, padding='same')(fx)
+    fx = BatchNormalization()(fx)
     out = concatenate([x,fx], axis=3)
     out = LeakyReLU()(out)
     out = BatchNormalization()(out)
@@ -163,7 +165,7 @@ def make_generator_3d(img_h, img_w):
         dconv2d_norm(256, 5, 1),
         dconv2d_norm(256, 5, 1),
     ]
-    last = dconv2d_norm(128, 3, 1)    
+    last = conv2d_norm(128, 3, 1)    
 
     x = inputs
 
@@ -178,6 +180,64 @@ def make_generator_3d(img_h, img_w):
     for fc in fc_stack:
         x = fc(x)
     x = tf.reshape(x, [1, img_h//8, img_w//8, 1])
+
+
+    # Upsampling and establishing the skip connections
+    for up, skip in zip(up_stack, skips):
+        x = up(x)
+        # x = tf.keras.layers.Concatenate()([x, skip])
+
+    x = last(x)
+
+    return tf.keras.Model(inputs=inputs, outputs=x)
+
+
+def make_generator_3drec(nang, px):
+    inputs = Input(shape=[nang, px, px])
+    down_stack = [
+        conv2d_norm(256, 3, 1),  # (batch_size, 128, 128, 64)
+        conv2d_norm(256, 3, 2),  # (batch_size, 64, 64, 128)
+        conv2d_norm(512, 3, 1),  # (batch_size, 32, 32, 256)
+        conv2d_norm(512, 3, 2),  # (batch_size, 16, 16, 512)
+        conv2d_norm(512, 3, 1),  # (batch_size, 8, 8, 512)
+        conv2d_norm(512, 3, 2),  # (batch_size, 4, 4, 512)
+        conv2d_norm(512, 3, 1),  # (batch_size, 2, 2, 512)
+        conv2d_norm(1, 3, 1),  # (batch_size, 1, 1, 512)
+    ]
+    fc_stack = [
+        dense_norm(128, 0.2),
+        dense_norm(256, 0.2),
+        dense_norm(128, 0.2),
+        dense_norm(px**2//64, 0),
+    ]
+
+    up_stack = [
+        dconv2d_norm(1, 3, 1),  # (batch_size, 2, 2, 1024)
+        dconv2d_norm(512, 3, 1),  # (batch_size, 4, 4, 1024)
+        dconv2d_norm(512, 3, 2),  # (batch_size, 8, 8, 1024)
+        dconv2d_norm(512, 3, 1),  # (batch_size, 16, 16, 1024)
+        dconv2d_norm(512, 3, 2),  # (batch_size, 32, 32, 512)
+        dconv2d_norm(512, 3, 1),  # (batch_size, 64, 64, 256)
+        dconv2d_norm(256, 3, 2),  # (batch_size, 128, 128, 128)
+        dconv2d_norm(256, 5, 1),
+        dconv2d_norm(256, 5, 1),
+        dconv2d_norm(256, 5, 1),
+    ]
+    last = conv2d_norm(128, 3, 1)    
+
+    x = inputs
+
+    # Downsampling through the model
+    skips = []
+    for down in down_stack:
+        x = down(x)
+        skips.append(x)
+
+    skips = reversed(skips[:-1])
+    x = tf.keras.layers.Flatten()(x)
+    for fc in fc_stack:
+        x = fc(x)
+    x = tf.reshape(x, [1, px//8, px//8, 1])
 
 
     # Upsampling and establishing the skip connections
@@ -235,8 +295,8 @@ def make_generator_3dped1(img_h, img_w):
     #     dconv2d_norm(256, 3, 16),
     #     dconv2d_norm(256, 3, 1)
     #      ]
-    x = resblock(x, 32, 3)
-    x = resblock(x, 64, 3)
+    x = resblock(x, 128, 3)
+    x = resblock(x, 128, 3)
     x = resblock(x, 128, 3)
     x = resblock(x, 256, 3)
     x = resblock(x, 512, 3)
