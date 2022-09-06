@@ -132,7 +132,7 @@ def make_generator(img_h, img_w, conv_num, conv_size, dropout, output_num):
     return Model(inputs=inputs, outputs=x)
 
 
-def make_generator_3d(img_h, img_w):
+def make_generator_3d(batch_size, img_h, img_w):
     inputs = Input(shape=[img_h, img_w, 1])
     down_stack = [
         conv2d_norm(256, 3, 1),  # (batch_size, 128, 128, 64)
@@ -177,7 +177,7 @@ def make_generator_3d(img_h, img_w):
     x = tf.keras.layers.Flatten()(x)
     for fc in fc_stack:
         x = fc(x)
-    x = tf.reshape(x, [1, img_h//8, img_w//8, 1])
+    x = tf.reshape(x, [batch_size, img_h//8, img_w//8, 1])
 
 
     # Upsampling and establishing the skip connections
