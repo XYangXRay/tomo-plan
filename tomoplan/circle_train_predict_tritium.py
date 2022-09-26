@@ -84,12 +84,7 @@ clear_output(wait=True)
 # for i in range(len(train_output)):
 #     fname = '/data/3d_tomo/train_circle/train_output/train_output' +  "-%03d" % (i) +'.tiff'
 #     tifffile.imsave(fname, train_output[i])
-
-
-
-    
-
-
+   
 def predict(fname_model, test_data, batch_size, fname_save):
     model = load_model(fname_model)
     test_input = np.zeros((batch_size,128,128,1))

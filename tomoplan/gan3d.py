@@ -296,7 +296,6 @@ class GAN3d:
 
         self.generator = make_generator_3d(self.batch_size, self.train_input.shape[1],
                                            self.train_input.shape[2])
-
         self.generator.summary()
         self.discriminator = make_discriminator()
         # self.generator.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = self.g_learning_rate))
