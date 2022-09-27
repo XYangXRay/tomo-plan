@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
 from IPython.display import clear_output
-from tomoplan.models import make_generator_3d, make_generator_3dped1, make_discriminator
+from tomoplan.models import make_generator_3d, make_generator_3dped, make_discriminator
 # from ganrec.utils import RECONmonitor
 
 
@@ -282,22 +282,24 @@ class GAN3d:
         self.conv_size = gan3d_args['conv_size']
         self.dropout = gan3d_args['dropout']
         self.l1_ratio = gan3d_args['l1_ratio']
+        self.batch_size = gan3d_args['batch_size']
         self.g_learning_rate = gan3d_args['g_learning_rate']
         self.d_learning_rate = gan3d_args['d_learning_rate']
         self.save_wpath = gan3d_args['save_wpath']
+        self.init_wpath = gan3d_args['init_wpath']
         self.generator = None
         self.discriminator = None
         self.generator_optimizer = None
         self.discriminator_optimizer = None
 
     def make_model(self):
-        self.generator = make_generator_3d(self.train_input.shape[1],
+
+        self.generator = make_generator_3d(self.batch_size, self.train_input.shape[1],
                                            self.train_input.shape[2])
-        # self.generator = make_generator_3dped1(self.train_input.shape[1],
-        #                                    self.train_input.shape[2])
         self.generator.summary()
         self.discriminator = make_discriminator()
-        self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
+        # self.generator.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = self.g_learning_rate))
+        # self.discriminator.compile(optimizer=tf.keras.optimizers.Adam(learning_rate = self.d_learning_rate))
         self.generator_optimizer = tf.keras.optimizers.Adam(self.g_learning_rate)
         self.discriminator_optimizer = tf.keras.optimizers.Adam(self.d_learning_rate)
 
@@ -333,25 +335,120 @@ class GAN3d:
                 'd_loss': d_loss}
 
     @property
+    # def train(self):
+    #     self.make_model()
+    #     if self.init_wpath:
+    #         self.generator.load_weights(self.init_wpath+'3d_generator.h5')
+    #         print('generator is initilized')
+    #         # self.discriminator.load_weights(self.init_wpath+'3d_discriminator.h5')
+    #    # train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
+    #    # train_output = tf.data.Dataset.from_tensor_slices(self.train_output)
+
+    #     train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, 
+    #                                                         self.train_output)) 
+
+    #     train_dataset = train_dataset.batch(self.batch_size)
+    #     for epoch in range(self.iter_num):
+    #         start = time.time()
+    #         n = 0
+    #         for train_x, train_y in train_dataset:
+    #             step_results = self.train_step(train_x, train_y)
+    #             if n % 10 == 0:
+    #                 print('.', end='', flush=True)
+    #             n += 1
+    #         clear_output(wait=True)
+    #         if (epoch + 1) % 10 == 0:
+    #             print ('Epoch {}: Generotor loss: {} Discirminator loss: {} \n'.format(epoch + 1, 
+    #                                                                                    step_results['g_loss'], 
+    #                                                                                    step_results['d_loss']))
+    #     g_wpath = self.save_wpath + '3d_generator.h5'
+    #     d_wpath = self.save_wpath + '3d_discriminator.h5'
+    #     self.generator.save(g_wpath)
+    #     self.discriminator.save(d_wpath)
+        
     def train(self):
         self.make_model()
-        train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, self.train_output))
-        train_dataset = train_dataset.batch(1)
-        n = 0
-        for step, (train_x, train_y) in train_dataset.repeat().take(self.iter_num).enumerate():
+        if self.init_wpath:
+            self.generator.load_weights(self.init_wpath+'3d_generator.h5')
+            print('generator is initilized')
+            # self.discriminator.load_weights(self.init_wpath+'3d_discriminator.h5')
+       # train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
+       # train_output = tf.data.Dataset.from_tensor_slices(self.train_output)
+
+        # train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, 
+        #                                                     self.train_output)) 
+        block_size = 200
+        # train_dataset = train_dataset.batch(self.batch_size)
+        for epoch in range(self.iter_num):
             start = time.time()
-            step_results = self.train_step(train_x, train_y)
-      
-            if step % 100 == 0:
-                print ('Epoch: {} Generator loss: {} Discriminator loss: {}\n'.format(step + 1, 
+            n = 0
+            for i in range(len(self.train_input)//block_size):
+                train_input = self.train_input[i*block_size:(i+1)*block_size]
+                train_output = self.train_output[i*block_size:(i+1)*block_size]
+                train_dataset = tf.data.Dataset.from_tensor_slices((train_input, 
+                                                                    train_output)) 
+                train_dataset = train_dataset.batch(self.batch_size)
+                # train_input = tf.data.Dataset.from_tensor_slices(train_input)
+                # train_input = train_input.batch(self.batch_size)
+                # train_output = tf.data.Dataset.from_tensor_slices(train_output)
+                # train_output = train_output.batch(self.batch_size)
+                for train_x, train_y in train_dataset:
+                    step_results = self.train_step(train_x, train_y)
+                    print('=', end='', flush=True)
+                    n += 1
+              
+
+            clear_output(wait=True)
+            print ('Epoch {}: Generotor loss: {} Discirminator loss: {} \n'.format(epoch + 1, 
                                                                                    step_results['g_loss'], 
                                                                                    step_results['d_loss']))
- 
+
         g_wpath = self.save_wpath + '3d_generator.h5'
         d_wpath = self.save_wpath + '3d_discriminator.h5'
         self.generator.save(g_wpath)
         self.discriminator.save(d_wpath)
-    
+
+    def distributed_train(self):
+        self.make_model()
+        if self.init_wpath:
+            self.generator.load_weights(self.init_wpath+'3d_generator.h5')
+            print('generator is initilized')
+            # self.discriminator.load_weights(self.init_wpath+'3d_discriminator.h5')
+       # train_input = tf.data.Dataset.from_tensor_slices(self.train_input)
+       # train_output = tf.data.Dataset.from_tensor_slices(self.train_output)
+
+        # train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, 
+        #                                                     self.train_output)) 
+        block_size = 200
+        # train_dataset = train_dataset.batch(self.batch_size)
+        for epoch in range(self.iter_num):
+            start = time.time()
+            n = 0
+            for i in range(len(self.train_input)//block_size):
+                train_input = self.train_input[i*block_size:(i+1)*block_size]
+                train_output = self.train_output[i*block_size:(i+1)*block_size]
+                train_dataset = tf.data.Dataset.from_tensor_slices((train_input, 
+                                                                    train_output)) 
+                train_dataset = train_dataset.batch(self.batch_size)
+                # train_input = tf.data.Dataset.from_tensor_slices(train_input)
+                # train_input = train_input.batch(self.batch_size)
+                # train_output = tf.data.Dataset.from_tensor_slices(train_output)
+                # train_output = train_output.batch(self.batch_size)
+                for train_x, train_y in train_dataset:
+                    step_results = mirrored_strategy.run(self.train_step(train_x, train_y))
+                    print('=', end='', flush=True)
+                    n += 1
+              
+
+            clear_output(wait=True)
+            print ('Epoch {}: Generotor loss: {} Discirminator loss: {} \n'.format(epoch + 1, 
+                                                                                   step_results['g_loss'], 
+                                                                                   step_results['d_loss']))
+
+        g_wpath = self.save_wpath + '3d_generator.h5'
+        d_wpath = self.save_wpath + '3d_discriminator.h5'
+        self.generator.save(g_wpath)
+        self.discriminator.save(d_wpath)
 
 def _get_gan3d_kwargs():
     return{
@@ -360,8 +457,9 @@ def _get_gan3d_kwargs():
         'conv_size': 3,
         'dropout': 0.25,
         'l1_ratio': 10,
-        'g_learning_rate': 5e-5,
-        'd_learning_rate': 1e-5,
+        'batch_size': 1,
+        'g_learning_rate': 5e-4,
+        'd_learning_rate': 1e-6,
         'save_wpath': './',
         'init_wpath': None,
         'init_model': False,

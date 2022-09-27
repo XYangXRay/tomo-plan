@@ -5,7 +5,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
 from IPython.display import clear_output
-from tomoplan.models import make_generator_3drec, make_generator_3dped1, make_discriminator
+from tomoplan.models import make_generator_3drec, make_generator_conv3d, make_generator_conv3dres, make_discriminator, make_discriminator_3d
 from tomoplan.utils import RECONmonitor
 
 
@@ -79,11 +79,12 @@ def tomo_bp(sinoi, ang):
 def project(data, ang):
     nang = ang.shape[0]
     data = tf.tile(data, [nang, 1, 1, 1])
-    data = tf.transpose(data, [0, 3,2, 1])
-    data = tfa.image.rotate(data, ang, interpolation='bilinear')
-    prj = tf.reduce_mean(data, 2, name=None)
+    # data = tf.transpose(data, [0, 2, 1, 3])
+    data = tf.transpose(data, [0, 2, 3, 1])
+    data = tfa.image.rotate(data, -ang, interpolation='bilinear')
+    prj = tf.reduce_mean(data, 1, name=None)
     prj = tf.image.per_image_standardization(prj)
-    prj = tf.transpose(prj, [0, 2, 1])
+    prj = tf.transpose(prj, [2, 1, 0])
     prj = tf.reshape(prj, [1, prj.shape[0], prj.shape[1], prj.shape[2]])
     return prj
 
@@ -161,11 +162,10 @@ class GANrec3d:
         self.discriminator_optimizer = None
 
     def make_model(self):
-        self.generator = make_generator_3drec(self.prj_input.shape[0],
+        self.generator = make_generator_conv3dres(self.prj_input.shape[0],
                                            self.prj_input.shape[1])
-        # self.generator.summary()
-        self.discriminator = make_discriminator()
-        self.filter_optimizer = tf.keras.optimizers.Adam(5e-3)
+        self.generator.summary()
+        self.discriminator = make_discriminator_3d()
         self.generator_optimizer = tf.keras.optimizers.Adam(self.g_learning_rate)
         self.discriminator_optimizer = tf.keras.optimizers.Adam(self.d_learning_rate)
 
@@ -181,12 +181,21 @@ class GANrec3d:
     def recon_step(self, prj, ang):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             recon = self.generator(prj)
+            # recon = self.generator(tf.reshape(prj[:,:,:,0], [1, self.px, self.px, 1]))
+            # recon = self.generator(tf.reshape(prj, [1, prj.shape[1], prj.shape[2], prj.shape[3]]))
             recon = tfnor_data(recon)
+            # recon = tf.transpose(recon, [0, 2, 1, 3])
+            recon = tf.reshape(recon, [1, self.px, self.px, self.px])
+            print(recon.shape)
             prj_rec = project(recon, ang)
+            # print(prj_rec.shape)
+            prj_rec = tfnor_data(prj_rec)
             # print(recon)
             # print(train_output)
-            real_output = self.discriminator(prj, training=True)
-            fake_output = self.discriminator(prj_rec, training=True)
+            # real_output = self.discriminator(prj, training=True)
+            real_output = self.discriminator(tf.reshape(prj, [1, prj.shape[1], prj.shape[2], prj.shape[3], 1]), training=True)
+            fake_output = self.discriminator(tf.reshape(prj_rec, [1, prj.shape[1], prj.shape[2], prj.shape[3], 1]), training=True)
+            # fake_output = self.discriminator(prj_rec, training=True)
             g_loss = generator_loss(fake_output, prj, prj_rec, self.l1_ratio)
             d_loss = discriminator_loss(real_output, fake_output)
         gradients_of_generator = gen_tape.gradient(g_loss,
@@ -205,7 +214,8 @@ class GANrec3d:
     @property
     def recon(self):
         nang, px, px = self.prj_input.shape
-        prj = np.reshape(self.prj_input, (1, nang, px, px))
+        prj_input = np.transpose(self.prj_input, (1, 2, 0))
+        prj = np.reshape(prj_input, (1, px, px, nang))
         prj = tf.cast(prj, dtype = tf.float32)
         ang = tf.cast(self.angle, dtype=tf.float32)
         self.make_model()
@@ -213,7 +223,7 @@ class GANrec3d:
             self.generator.load_weights(self.init_wpath+'generator.h5')
             print('generator is initilized')
             self.discriminator.load_weights(self.init_wpath+'discriminator.h5')
-        recon = np.zeros((self.iter_num, px, px, 1))
+        recon = np.zeros((self.iter_num, px, px, px))
         gen_loss = np.zeros((self.iter_num))
 
         ###########################################################################
@@ -237,10 +247,10 @@ class GANrec3d:
             if (epoch + 1) % 100 == 0:
                 # checkpoint.save(file_prefix=checkpoint_prefix)
                 if recon_monitor:
-                    prj_rec = np.reshape(step_result['prj_rec'], (nang, px, px))
-                    prj_diff = np.abs(prj_rec - self.prj_input.reshape((nang, px, px)))
+                    prj_rec = np.reshape(step_result['prj_rec'], (px, px, nang))
+                    prj_diff = np.abs(prj_rec - prj_input.reshape((px, px, nang)))
                     rec_plt = np.reshape(recon[epoch, 64, :, :], (px, px))
-                    recon_monitor.update_plot(epoch, prj_diff[0], rec_plt, plot_x, plot_loss)
+                    recon_monitor.update_plot(epoch, prj_diff[:, :, 0], rec_plt, plot_x, plot_loss)
                 print('Iteration {}: G_loss is {} and D_loss is {}'.format(epoch + 1,
                                                                            gen_loss[epoch],
                                                                            step_result['d_loss'].numpy()))
@@ -257,9 +267,9 @@ def _get_gan3d_kwargs():
         'conv_num': 32,
         'conv_size': 3,
         'dropout': 0.25,
-        'l1_ratio': 10,
-        'g_learning_rate': 5e-5,
-        'd_learning_rate': 1e-5,
+        'l1_ratio': 50,
+        'g_learning_rate': 1e-4,
+        'd_learning_rate': 1e-6,
         'save_wpath': './',
         'init_wpath': None,
         'recon_monitor': True,
