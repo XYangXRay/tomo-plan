@@ -86,8 +86,8 @@ import tifffile
 
 
     
-batch_size = 100
-data_size =1000
+batch_size = 400
+data_size =4000
 
 def predict(fname_model, test_data, batch_size, fname_save):
     model = load_model(fname_model)
