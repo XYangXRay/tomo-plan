@@ -200,7 +200,7 @@ def make_generator_3d(batch_size, img_h, img_w):
         conv2d_norm(512, 3, 1),  # (batch_size, 8, 8, 512)
         conv2d_norm(512, 3, 2),  # (batch_size, 4, 4, 512)
         conv2d_norm(512, 3, 1),  # (batch_size, 2, 2, 512)
-        conv2d_norm(1, 3, 1),  # (batch_size, 1, 1, 512)
+        conv2d_norm(128, 3, 1),  # (batch_size, 1, 1, 512)
     ]
     fc_stack = [
         dense_norm(128, 0.2),

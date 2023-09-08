@@ -17,8 +17,8 @@ prj= prj/prj.max()
 # print(data.min(), data.max())
 start = time.time()
 
-gan3d_object = GANrec3d(prj, ang, iter_num=5000)
+gan3d_object = GANrec3d(prj, ang, iter_num=1000)
 rec = gan3d_object.recon
 print(f'Reconstruction time is {time.time()-start} s.')
 
-tifffile.imwrite('/nsls2/users/xyang4/data/recon_test_20220919.tiff', rec)
+tifffile.imwrite('/nsls2/users/xyang4/data/recon_test_20230708.tiff', rec)
