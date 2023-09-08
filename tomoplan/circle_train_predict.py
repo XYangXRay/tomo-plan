@@ -117,24 +117,24 @@ train_obj = GAN3d(train_input, train_output,
                   l1_ratio = 10,
                   g_learning_rate = 5e-4, d_learning_rate = 1e-6, 
                 #   init_wpath = '/nsls2/users/xyang4/data/',
-                  save_wpath='/nsls2/users/xyang4/data/')
+                  save_wpath='/nsls2/data/staff/xyang4/data/')
 train_obj.train
 
 print('training has been done')
 
-data = tifffile.imread('/data/3d_tomo/proj_Ni_K.tif')
+data = tifffile.imread('/nsls2/data/staff/xyang4/data/3d_tomo/proj_Ni_K.tif')
 test_data = np.zeros((128, 128))
 test_data[20:101, 3:124] = data[0]
 
-predict('/nsls2/users/xyang4/data/3d_generator.h5',
+predict('/nsls2/data/staff/xyang4/data/3d_generator.h5',
         test_data,
         batch_size,
-        '/nsls2/users/xyang4/data/exp_predict_1000_l10_20220906.tiff')
+        '/nsls2/data/staff/xyang4/data/exp_predict_1000_l10_20220906.tiff')
 
 test_data = train_input[0]
 predict('/nsls2/users/xyang4/data/3d_generator.h5',
         test_data,
         batch_size,
-        '/nsls2/users/xyang4/data/test_predict_1000_l10_20220906.tiff')
+        '/nsls2/data/staff/xyang4/data/test_predict_1000_l10_20220906.tiff')
 
 
