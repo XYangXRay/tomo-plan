@@ -97,8 +97,8 @@ def predict(fname_model, test_data, batch_size, fname_save):
     test_output = test_output.numpy()[0]
     tifffile.imwrite(fname_save, test_output.reshape((128, 128, 128)))
 
-train_input = tifffile.imread('/data/3d_tomo/train_circle/train_input.tiff')
-dirname = '/data/3d_tomo/train_circle/train_output/'
+train_input = tifffile.imread('/nsls2/data/staff/xyang4/data/3d_tomo/train_circle/train_input.tiff')
+dirname = '/nsls2/data/staff/xyang4/data/3d_tomo/train_circle/train_output/'
 train_output = []
 for fname in os.listdir(dirname):
     print(fname)
