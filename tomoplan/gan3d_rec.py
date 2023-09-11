@@ -5,7 +5,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
 from IPython.display import clear_output
-from tomoplan.models import make_generator_3drec, make_generator_conv3d, make_generator_conv3dres, make_discriminator, make_discriminator_3d
+from tomoplan.models import make_generator_3drec, make_generator_conv3d2, make_generator_3drec, make_discriminator, make_discriminator_3d
 from tomoplan.utils import RECONmonitor
 
 
@@ -162,7 +162,7 @@ class GANrec3d:
         self.discriminator_optimizer = None
 
     def make_model(self):
-        self.generator = make_generator_conv3dres(self.prj_input.shape[0],
+        self.generator = make_generator_conv3d2(self.prj_input.shape[0],
                                            self.prj_input.shape[1])
         self.generator.summary()
         self.discriminator = make_discriminator_3d()
@@ -268,7 +268,7 @@ def _get_gan3d_kwargs():
         'conv_size': 3,
         'dropout': 0.25,
         'l1_ratio': 50,
-        'g_learning_rate': 1e-4,
+        'g_learning_rate': 1e-3,
         'd_learning_rate': 1e-6,
         'save_wpath': './',
         'init_wpath': None,

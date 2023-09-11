@@ -86,8 +86,8 @@ import tifffile
 
 
     
-batch_size = 100
-data_size =1000
+batch_size = 200
+data_size =4000
 
 def predict(fname_model, test_data, batch_size, fname_save):
     model = load_model(fname_model)
@@ -97,8 +97,8 @@ def predict(fname_model, test_data, batch_size, fname_save):
     test_output = test_output.numpy()[0]
     tifffile.imwrite(fname_save, test_output.reshape((128, 128, 128)))
 
-train_input = tifffile.imread('/data/3d_tomo/train_circle/train_input.tiff')
-dirname = '/data/3d_tomo/train_circle/train_output/'
+train_input = tifffile.imread('/nsls2/data/staff/xyang4/data/3d_tomo/train_circle/train_input.tiff')
+dirname = '/nsls2/data/staff/xyang4/data/3d_tomo/train_circle/train_output/'
 train_output = []
 for fname in os.listdir(dirname):
     print(fname)
@@ -113,28 +113,28 @@ train_input = train_input[:data_size]
 train_output = train_output[:data_size]
 print('start to train the model')
 train_obj = GAN3d(train_input, train_output, 
-                  iter_num = 80, batch_size = batch_size, 
+                  iter_num = 40, batch_size = batch_size, 
                   l1_ratio = 10,
                   g_learning_rate = 5e-4, d_learning_rate = 1e-6, 
                 #   init_wpath = '/nsls2/users/xyang4/data/',
-                  save_wpath='/nsls2/users/xyang4/data/')
+                  save_wpath='/nsls2/data/staff/xyang4/data/')
 train_obj.train
 
 print('training has been done')
 
-data = tifffile.imread('/data/3d_tomo/proj_Ni_K.tif')
+data = tifffile.imread('/nsls2/data/staff/xyang4/data/3d_tomo/proj_Ni_K.tif')
 test_data = np.zeros((128, 128))
 test_data[20:101, 3:124] = data[0]
 
-predict('/nsls2/users/xyang4/data/3d_generator.h5',
+predict('/nsls2/data/staff/xyang4/data/3d_generator.h5',
         test_data,
         batch_size,
-        '/nsls2/users/xyang4/data/exp_predict_1000_l10_20220906.tiff')
+        '/nsls2/data/staff/xyang4/data/exp_predict_1000_l10_20220906.tiff')
 
 test_data = train_input[0]
 predict('/nsls2/users/xyang4/data/3d_generator.h5',
         test_data,
         batch_size,
-        '/nsls2/users/xyang4/data/test_predict_1000_l10_20220906.tiff')
+        '/nsls2/data/staff/xyang4/data/test_predict_1000_l10_20220906.tiff')
 
 

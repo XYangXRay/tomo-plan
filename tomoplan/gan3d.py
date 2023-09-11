@@ -5,6 +5,7 @@ import tensorflow_addons as tfa
 import numpy as np
 from IPython.display import clear_output
 from tomoplan.models import make_generator_3d, make_generator_3dped, make_discriminator
+
 # from ganrec.utils import RECONmonitor
 
 
@@ -377,7 +378,7 @@ class GAN3d:
 
         # train_dataset = tf.data.Dataset.from_tensor_slices((self.train_input, 
         #                                                     self.train_output)) 
-        block_size = 200
+        block_size = 400
         # train_dataset = train_dataset.batch(self.batch_size)
         for epoch in range(self.iter_num):
             start = time.time()
