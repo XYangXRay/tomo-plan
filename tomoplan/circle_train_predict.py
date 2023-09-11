@@ -86,7 +86,7 @@ import tifffile
 
 
     
-batch_size = 400
+batch_size = 200
 data_size =4000
 
 def predict(fname_model, test_data, batch_size, fname_save):
@@ -113,7 +113,7 @@ train_input = train_input[:data_size]
 train_output = train_output[:data_size]
 print('start to train the model')
 train_obj = GAN3d(train_input, train_output, 
-                  iter_num = 80, batch_size = batch_size, 
+                  iter_num = 40, batch_size = batch_size, 
                   l1_ratio = 10,
                   g_learning_rate = 5e-4, d_learning_rate = 1e-6, 
                 #   init_wpath = '/nsls2/users/xyang4/data/',
